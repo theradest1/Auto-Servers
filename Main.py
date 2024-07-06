@@ -14,6 +14,10 @@ bot = commands.Bot(command_prefix=">>", intents=intents)
 
 processes = {}
 
+if not os.path.exists("Repos"):
+	print("Created repos folder")
+	os.makedirs("Repos")
+
 class Process:
 	def __init__(self, process):
 		self.startTime = time.time
@@ -41,15 +45,14 @@ async def run(ctx, arg):
 			await ctx.send("Starting...")
 			try:
 				#cd so it is executed in it's folder
-				cdCommand = "cd Repos/" + arg
+				executeDirectory = "Repos/" + arg
 
 				#get run command
 				runFile = open("Repos/" + arg + "/run.txt")
 				content = runFile.readlines()
 				runCommand = content[0]
 
-				fullCommand = cdCommand + " && " + runCommand
-				process = subprocess.Popen(fullCommand, shell=True)
+				process = subprocess.Popen(runCommand, cwd=executeDirectory)
 
 				processes[arg] = Process(process)
 				await ctx.send("Server started")
