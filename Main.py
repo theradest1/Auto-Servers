@@ -15,7 +15,7 @@ bot = commands.Bot(command_prefix=">>", intents=intents)
 processes = {}
 
 if not os.path.exists("Repos"):
-	print("Created repos folder")
+	print("Created Repos folder")
 	os.makedirs("Repos")
 
 class Process:
@@ -27,7 +27,8 @@ def cleanUp():
 	for serverKey in processes:
 		server = processes[serverKey]
 		server.process.terminate()
-		print(server.process.wait())
+		server.process.wait()
+		del processes[serverKey]
 
 def command(args):
 	process = subprocess.Popen(args)
