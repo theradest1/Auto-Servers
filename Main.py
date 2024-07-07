@@ -66,29 +66,30 @@ async def run(ctx, arg):
 
 @bot.command()
 async def update(ctx, arg):
-	if arg in list(processes.keys()):
-		await ctx.send("Updating...")
-		try:
+	await ctx.send("Updating...")
+	try:
+		if arg in list(processes.keys()):
+			await ctx.send("Terminating...")
 			terminateProcess(arg)
 
-			#pull
-			repo = git.Repo("Repos/" + arg)
-			repo.remotes.origin.pull()
-			
-			#get run command
-			runFile = open("Repos/" + arg + "/run.txt")
-			content = runFile.readlines()
-			runCommand = content[0]
+		#pull
+		await ctx.send("Pulling...")
+		repo = git.Repo("Repos/" + arg)
+		repo.remotes.origin.pull()
+		
+		#get run command
+		await ctx.send("Starting...")
+		runFile = open("Repos/" + arg + "/run.txt")
+		content = runFile.readlines()
+		runCommand = content[0]
 
-			process = subprocess.Popen(runCommand, cwd="Repos/" + arg)
+		process = subprocess.Popen(runCommand, cwd="Repos/" + arg)
 
-			processes[arg] = Process(process)
+		processes[arg] = Process(process)
 
-			await ctx.send("Updated")
-		except Exception as e:
-			await ctx.send("Couldnt update:\n" + str(e))
-	else:
-		await ctx.send("Process isnt running")
+		await ctx.send("Server updated")
+	except Exception as e:
+		await ctx.send("Couldnt update:\n" + str(e))
 	return
 
 @bot.command()
