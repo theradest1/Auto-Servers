@@ -1,8 +1,8 @@
-import discord
+import discord #pip install discord
 from discord.ext import commands
 import subprocess
 import os
-import git
+import git #pip install gitpython
 import time
 
 intents = discord.Intents.default()
@@ -23,12 +23,11 @@ class Process:
 		self.startTime = time.time
 		self.process = process
 
-def cleanUp():
-	for serverKey in processes:
-		server = processes[serverKey]
-		server.process.terminate()
-		server.process.wait()
-		del processes[serverKey]
+def terminateProcess(key):
+	server = processes[key]
+	server.process.terminate()
+	server.process.wait()
+	del processes[key]
 
 def command(args):
 	process = subprocess.Popen(args)
@@ -67,6 +66,29 @@ async def run(ctx, arg):
 
 @bot.command()
 async def update(ctx, arg):
+	if arg in list(processes.keys()):
+		await ctx.send("Updating...")
+		try:
+			terminateProcess(arg)
+
+			#pull
+			repo = git.Repo("Repos/" + arg)
+			repo.remotes.origin.pull()
+			
+			#get run command
+			runFile = open("Repos/" + arg + "/run.txt")
+			content = runFile.readlines()
+			runCommand = content[0]
+
+			process = subprocess.Popen(runCommand, cwd="Repos/" + arg)
+
+			processes[arg] = Process(process)
+
+			await ctx.send("Updated")
+		except Exception as e:
+			await ctx.send("Couldnt update:\n" + str(e))
+	else:
+		await ctx.send("Process isnt running")
 	return
 
 @bot.command()
@@ -91,8 +113,9 @@ async def listRunning(ctx):
 
 #commands
 @bot.command()
-async def clean(ctx, *args):
-	cleanUp()
+async def clean(ctx):
+	for serverKey in processes:
+		terminateProcess(serverKey)
 	await ctx.send("Cleaned up processes")
 
 #starting things
