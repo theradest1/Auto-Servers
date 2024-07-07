@@ -52,6 +52,8 @@ async def run(ctx, arg):
 				content = runFile.readlines()
 				runCommand = content[0]
 
+				print("Cmd:", runCommand, "Dir:", executeDirectory)
+
 				process = subprocess.Popen(runCommand, cwd=executeDirectory)
 
 				processes[arg] = Process(process)
