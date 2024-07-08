@@ -54,12 +54,13 @@ async def run(ctx, arg):
 
 				print("Cmd:", runCommand, "Dir:", executeDirectory)
 
-				process = subprocess.Popen(runCommand, cwd=executeDirectory)
+				process = subprocess.Popen([runCommand], cwd=executeDirectory)
 
 				processes[arg] = Process(process)
 				await ctx.send("Server started")
 			except Exception as e:
 				await ctx.send("Couldn't start server:\n" + str(e))
+				print(e)
 		else:
 			await ctx.send("Run file not present")
 	else:
@@ -87,7 +88,7 @@ async def update(ctx, arg):
 			content = runFile.readlines()
 			runCommand = content[0]
 
-			process = subprocess.Popen(runCommand, cwd="Repos/" + arg)
+			process = subprocess.Popen([runCommand], cwd="Repos/" + arg)
 
 			processes[arg] = Process(process)
 
