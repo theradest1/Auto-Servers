@@ -54,7 +54,7 @@ async def run(ctx, arg):
 
 				print("Cmd:", runCommand, "Dir:", executeDirectory)
 
-				process = subprocess.Popen([runCommand], cwd=executeDirectory)
+				process = subprocess.Popen(runCommand.split(" "), cwd=executeDirectory)
 
 				processes[arg] = Process(process)
 				await ctx.send("Server started")
@@ -88,7 +88,7 @@ async def update(ctx, arg):
 			content = runFile.readlines()
 			runCommand = content[0]
 
-			process = subprocess.Popen([runCommand], cwd="Repos/" + arg)
+			process = subprocess.Popen(runCommand.split(" "), cwd="Repos/" + arg)
 
 			processes[arg] = Process(process)
 
