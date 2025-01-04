@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+import asyncio
 from mcstatus import JavaServer
 import subprocess
 import os
@@ -62,8 +63,12 @@ max_on_time = 30
 
 logBuffer = []
 logThread = None
+
+errorInLogs = False
+serverStartCtx = None
+
 def readLogs():
-	global logBuffer
+	global logBuffer, errorInLogs
 
 	#wait until server is on
 	noStdout = True
@@ -79,6 +84,13 @@ def readLogs():
 		line = server.stdout.readline()
 		if line:
 			logBuffer.append(line.strip())
+			
+			if "ERROR" in line:
+				errorInLogs = True
+		else:
+			time.sleep(.05) #let the cpu live
+
+
 	print("Stopped logging")
 
 def serverCommand(command):
@@ -119,7 +131,7 @@ def serverOnline():
 	try:
 		mcserver.ping()
 		return True
-	except ConnectionRefusedError:
+	except (ConnectionRefusedError, OSError) as e:
 		return False
 	
 def stringToDiscordFile(inputString, filename):
@@ -133,7 +145,19 @@ def stringToDiscordFile(inputString, filename):
 
 	return discord_file
 
-def start_server():
+def stopServer():
+	global server
+
+	#soft stop (so it saves worlds)
+	serverCommand("stop")
+	server.wait(timeout=20)
+
+	#make sure it's dead
+	server.terminate()
+	server.wait()
+	server = None
+
+def startServer():
 	global logThread, logBuffer, server
 
 	server = subprocess.Popen(
@@ -151,9 +175,29 @@ def start_server():
 	logThread = threading.Thread(target=readLogs, daemon=True)
 	logThread.start()
 
+	# Loop until on
+	start_time = time.time()
+	while time.time() - start_time < 60 and not serverOnline():
+		time.sleep(0.5)  # so it doesn't ddos the server
+
+	if time.time() - start_time >= 60:
+		return False
+	else:
+		return True
+	
+async def sendLogError():
+	global serverStartCtx, logBuffer
+
+	logString = "\n".join(logBuffer)
+	logBuffer = []
+
+	#send as file since it's probably too big
+	file = stringToDiscordFile(logString, "server_logs.txt")
+	await serverStartCtx.send(f"The server had an error, here are the logs:", file=file)
+
 @bot.command()
 async def server(ctx, *args):
-	global mcserver, server, logBuffer
+	global mcserver, server, logBuffer, serverStartCtx
  
 	arg = args[0].lower()
 
@@ -182,14 +226,7 @@ async def server(ctx, *args):
 		elif arg == "stop":
 			message = await ctx.send("Stopping server...")
 
-			#soft stop (so it saves worlds)
-			serverCommand("stop")
-			server.wait(timeout=20)
-
-			#make sure it's dead
-			server.terminate()
-			server.wait()
-			server = None
+			stopServer()
 
 			await message.edit(content="Server stopped")
 	else:
@@ -197,23 +234,22 @@ async def server(ctx, *args):
 			await ctx.send("The server was not running")
 		elif arg == "start":
 			message = await ctx.send("Starting server...")
-			start_server()
+			started = startServer()
 
-			# Loop until on
-			start_time = time.time()
-			while time.time() - start_time < 60 and not serverOnline():
-				time.sleep(0.5)  # so it doesn't ddos the server
+			serverStartCtx = ctx
 
-			if time.time() - start_time >= 60:
-				await message.edit(content="Server couldn't start or is taking over a minute to start")
-			else:
+			if started:
 				await message.edit(content="The server has been started")
+			else:
+				await message.edit(content="Server couldn't start or is taking over a minute to start")
+
 		else:
 			await ctx.send("The server is not running")
 	
 @bot.command()	
 async def plugin(ctx, *args):
 	arg = args[0].lower()
+	fast = len(args) > 1 and args[1].lower() == "fast"
 	if arg == "build":
 		message = await ctx.send("Building...")
 
@@ -242,21 +278,19 @@ async def plugin(ctx, *args):
 
 		#reload server if on, otherwise just notify that they were built
 		if serverOnline():
-			await message.edit(content="Reloading Server Plugins...")
-
-			#reload command
-			serverCommand("rl confirm")
-
-			#get logs while reloading
-			output = getLogsUntil(line="Reload complete")
-
-			#if there was an error
-			if "ERROR" in output:
-				#send as file since it's probably too big
-				file = stringToDiscordFile(output, "server_logs.txt")
-				await ctx.send(f"There was an error when refreshing plugins:", file=file)
+			if fast:
+				serverCommand("rl confirm")
+				await message.edit(content="Done - Sent reload command, be wary of using this")
 			else:
-				await message.edit(content="Plugins built and refreshed")
+				await message.edit(content="Stopping Server...")
+				stopServer()
+				await message.edit(content="Restarting Server...")
+				started = startServer()
+
+				if started:
+					await message.edit(content="Restart Complete")
+				else:
+					await message.edit(content="Server couldn't start or is taking over a minute to start")
 		else:
 			await message.edit(content="Plugins built")
 
@@ -271,6 +305,22 @@ async def git(ctx, arg):
 			await message.edit(content="Git pull successful")
 		except:
 			await message.edit(content="Git was not able to pull")
+
+@bot.event
+async def on_ready():
+    check_variable_loop.start()  # Start the loop when the bot is ready
+
+@tasks.loop(seconds=1)
+async def check_variable_loop():
+    global errorInLogs
+    # Add your logic here
+    if errorInLogs:
+        await sendLogError()
+    errorInLogs = False
+
+@check_variable_loop.before_loop
+async def before_check_variable_loop():
+    await bot.wait_until_ready()  # Ensure bot is ready before starting the loop
 
 #starting things
 bot.run(token)
