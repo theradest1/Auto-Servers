@@ -85,7 +85,7 @@ def readLogs():
 		if line:
 			logBuffer.append(line.strip())
 			
-			if "ERROR" in line:
+			if "ERROR]: Error occurred while enabling modded921" in line:
 				errorInLogs = True
 		else:
 			time.sleep(.05) #let the cpu live
@@ -249,7 +249,7 @@ async def server(ctx, *args):
 @bot.command()	
 async def plugin(ctx, *args):
 	arg = args[0].lower()
-	fast = len(args) > 1 and args[1].lower() == "fast"
+	fullReload = len(args) > 1 and args[1].lower() == "full"
 	if arg == "build":
 		message = await ctx.send("Building...")
 
@@ -278,10 +278,7 @@ async def plugin(ctx, *args):
 
 		#reload server if on, otherwise just notify that they were built
 		if serverOnline():
-			if fast:
-				serverCommand("rl confirm")
-				await message.edit(content="Done - Sent reload command, be wary of using this")
-			else:
+			if fullReload:
 				await message.edit(content="Stopping Server...")
 				stopServer()
 				await message.edit(content="Restarting Server...")
@@ -291,6 +288,9 @@ async def plugin(ctx, *args):
 					await message.edit(content="Restart Complete")
 				else:
 					await message.edit(content="Server couldn't start or is taking over a minute to start")
+			else:
+				serverCommand("rl confirm")
+				await message.edit(content="Done, use `>>plugin build full` if you have weird errors")
 		else:
 			await message.edit(content="Plugins built")
 
